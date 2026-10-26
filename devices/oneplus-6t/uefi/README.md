@@ -46,19 +46,24 @@ python3 build_uefi.py -d fajita -r RELEASE    # -> Build/fajitaPkg/RELEASE_CLANG
 
 (The POCO README's `mu_nasm`/Mono note applies here too if the build complains about nasm.)
 
-## Step 3 — the HakiOS XnuLoader layer (TODO, shared with the POCO)
+## Step 3 — the HakiOS XnuLoader layer
 
-The base `fajitaPkg` boots UEFI; it does not yet start XNU. The POCO port adds, on top of its package,
-the HakiOS integration from `../../poco-x5-pro/uefi/` — `mu-silicium.patch` plus `files/`:
-- `BootShim/BootShim.S`: copies the "XNUP" container that sits behind the UEFI image to `0xF0000000`.
-- `Silicon/Silicium/SiliciumPkg/Library/BootManagerLib/XnuLoader.[ch]`: starts the XNU loader from
-  that container instead of showing a boot menu.
+The base `fajitaPkg` boots UEFI; it does not yet start XNU. That is the job of the HakiOS layer:
+- `BootShim/BootShim.S`: copies the "XNUP" payload that sits behind the FD to `PAYLOAD_BASE`.
+- `Silicon/Silicium/SiliciumPkg/Library/BootManagerLib/{BootManager.c,BootManagerLib.inf}` +
+  `XnuLoader.[ch]`: starts the XNU loader from that payload instead of showing a boot menu.
 
-These are **SoC/loader-level, not panel-level**, so they should port to fajita with little change.
-The task: apply that same patch + `XnuLoader.[ch]` onto the Mu-Silicium tree after Step 1, confirm
-the `BootShim` load address and the container offset against the 6T memory map (FD `0x9FC00000`,
-splash `0x9D400000` — both equal to the OnePlus 6's, so likely unchanged), rebuild, and
-`export.sh`-style snapshot it back into this directory as `fajita`'s own `mu-silicium.patch`/`files/`.
+Every one of these is a **shared SiliciumPkg/BootShim file with no device-specific address** (it uses
+the `PAYLOAD_BASE` symbol and the `XNUP` magic, all memory-map-relative), so fajita reuses the POCO's
+layer verbatim — verified: the POCO's `mu-silicium.patch` applies cleanly to current Mu-Silicium.
+
+```sh
+devices/oneplus-6t/uefi/add-xnuloader.sh      # applies ../../poco-x5-pro/uefi/{mu-silicium.patch,XnuLoader.[ch]}
+```
+
+The script is idempotent and reverts with `--revert`. It reuses the POCO's files as the single source
+of this shared layer rather than duplicating the 600-line patch here. After it, build Step 2's command
+produces an XNU-booting UEFI.
 
 ## ABL `fastboot boot` quirks (both the base and the HakiOS build)
 
