@@ -1505,7 +1505,8 @@ hakios_goodix_init(void)
 	uint32_t enabled = 0;
 	thread_t thread;
 
-	if (!PE_parse_boot_argn("touchscreen", &enabled, sizeof(enabled)) || !enabled) {
+	/* any nonzero value is this (the POCO) -- except 2, which selects the OnePlus 6T (hakios.oneplus6t.c) */
+	if (!PE_parse_boot_argn("touchscreen", &enabled, sizeof(enabled)) || !enabled || enabled == 2) {
 		return;
 	}
 	PE_parse_boot_argn("touch_flip", &flip, sizeof(flip));
