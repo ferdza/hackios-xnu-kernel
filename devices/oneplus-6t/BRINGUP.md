@@ -16,8 +16,12 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 [x] 2. make images .......... OK
 [x] 3. make loader .......... OK (loader.efi)
 [x] 3. setup.sh --stage1 .... OK (tcsh buildé, availability.pl créé)
-🚩 3. make kernel ........... si erreur « init_sysent.c ... \(sy_call_t » -> sudo apt install gawk
-                             (mawk de Debian casse la génération ; gawk la répare) puis  make kernel
+🚩 3. make kernel ........... erreur « init_sysent.c ... \(sy_call_t » (mawk de Debian) :
+                             le .c foireux est mis en cache, gawk seul ne suffit pas. Fais :
+                               sed -i 's/\\(sy_call_t \*\\)/(sy_call_t *)/g' \
+                                 xnu-src/xnu-8796.121.2/bsd/kern/makesyscalls.sh
+                               rm -rf xnu-src/xnu-8796.121.2/BUILD   (garde loader.efi + images)
+                               make kernel
                              succès = ça finit sur  check_all_exports  (voir étape 3)
 [ ] 4. UEFI fajita
 [ ] 5. firmware (make DEVICE=oneplus-6t firmware)
