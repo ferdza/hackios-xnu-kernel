@@ -17,8 +17,15 @@ sudo pacman -S --needed base-devel git curl clang lld python perl xz nasm llvm a
 ```
 **Debian/Ubuntu :**
 ```sh
-sudo apt install build-essential git curl clang lld python3 perl xz-utils nasm llvm gcc-aarch64-linux-gnu python3-pip python3-venv android-tools-adb android-tools-fastboot
+sudo apt install build-essential git curl clang lld python3 perl xz-utils nasm llvm \
+  gcc-aarch64-linux-gnu python3-pip python3-venv android-tools-adb android-tools-fastboot \
+  bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse
 ```
+> Les derniers (`bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse`) sont
+> indispensables au build du kernel/loader : sans eux tu auras `bison: Aucun fichier`,
+> `'uuid/uuid.h' file not found` ou `no LZFSE decoder`. Si tu as lancé un build avant de les
+> installer, relance **`xnu-deps/setup.sh`** à la main ensuite (il complète le SDK, dont
+> `availability.pl`) — il ne se relance pas tout seul une fois `xnu-clang` construit.
 
 Il te faut aussi **theos** dans `~/theos` (pour les outils `ld64`/`otool` et le SDK `iPhoneOS16.5.sdk`) — voir https://theos.dev/docs/installation-linux.
 
