@@ -23,6 +23,9 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
                                rm -rf xnu-src/xnu-8796.121.2/BUILD   (garde loader.efi + images)
                                make kernel
                              succès = ça finit sur  check_all_exports  (voir étape 3)
+    (si le LD final dit « ld64: Cannot fork » = plus assez de RAM/process au link :
+     relance  make kernel  -- les .o sont en cache, le link tourne seul ; sinon  make kernel JOBS=1,
+     monte  ulimit -u, ou ajoute du swap. Pas un bug du port.)
 [ ] 4. UEFI fajita
 [ ] 5. firmware (make DEVICE=oneplus-6t firmware)
 [ ] 6. boot sur le tél
