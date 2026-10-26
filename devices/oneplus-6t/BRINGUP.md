@@ -15,8 +15,9 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 [x] 0. Outils installés (apt + theos)
 [x] 2. make images .......... OK (root.apfs / system.apfs faits)
 [x] 3. make loader .......... OK (loader.efi construit)
-🚩 3. make kernel ........... BLOQUÉ : lance d'abord  xnu-deps/setup.sh --stage1
-                             (sinon erreur « availability.pl ... not found »)
+🚩 3. make kernel ........... BLOQUÉ : setup.sh --stage1 meurt sur « tcsh did not build »
+                             -> manque les headers ncurses :  sudo apt install libncurses-dev
+                             puis relance  xnu-deps/setup.sh --stage1  (il ira jusqu'à availability.pl)
 [ ] 4. UEFI fajita
 [ ] 5. firmware (make DEVICE=oneplus-6t firmware)
 [ ] 6. boot sur le tél
@@ -42,13 +43,14 @@ sudo pacman -S --needed base-devel git curl clang lld python perl xz nasm llvm a
 ```sh
 sudo apt install build-essential git curl clang lld python3 perl xz-utils nasm llvm \
   gcc-aarch64-linux-gnu python3-pip python3-venv android-tools-adb android-tools-fastboot \
-  bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse
+  bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse libncurses-dev
 ```
-> Les derniers (`bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse`) sont
-> indispensables au build du kernel/loader : sans eux tu auras `bison: Aucun fichier`,
-> `'uuid/uuid.h' file not found` ou `no LZFSE decoder`. Si tu as lancé un build avant de les
-> installer, relance **`xnu-deps/setup.sh`** à la main ensuite (il complète le SDK, dont
-> `availability.pl`) — il ne se relance pas tout seul une fois `xnu-clang` construit.
+> Les derniers sont indispensables au build du kernel/loader : sans eux tu auras `bison: Aucun
+> fichier`, `'uuid/uuid.h' file not found`, `no LZFSE decoder`, ou `tcsh did not build` (ça =
+> `libncurses-dev` manquant, puisque `setup.sh` compile tcsh et s'arrête dessus). Si tu as lancé un
+> build avant de les installer, relance **`xnu-deps/setup.sh --stage1`** à la main ensuite (il
+> complète le SDK, dont `availability.pl`) — `make` ne le relance pas tout seul une fois `xnu-clang`
+> construit.
 
 Il te faut aussi **theos** dans `~/theos` (pour les outils `ld64`/`otool` et le SDK `iPhoneOS16.5.sdk`) — voir https://theos.dev/docs/installation-linux.
 
