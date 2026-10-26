@@ -22,8 +22,14 @@ SDM845 reference guesses in `soc.args.sdm845-reference` are superseded by this.
   before the APFS root can mount.
 
 ## Touch
-- **Synaptics S3320**, RMI4 function driver, I²C node `synaptics-rmi-ts@20` (`synaptics,s3320`).
-  Has `irq-gpio`, `reset-gpio`, `display-coords`, `panel-coords`, `tx-rx-num` in the tree.
+- **Synaptics S3320**, RMI4, node `/soc/i2c@a90000/synaptics-rmi-ts@20`, compatible `HWK,synaptics,s3320`.
+- Bus: **`i2c@a90000`**, compatible `qcom,i2c-geni` → GENI **I²C** serial engine at **0xa90000**
+  (north QUP cluster, wrapper `qupv3_1_geni_se@ac0000`). I²C slave address **0x20**.
+- IRQ: TLMM **GPIO 125** (`0x7d`, flags `0x2008`). Reset: TLMM **GPIO 99** (`0x63`).
+- **Note the bus type:** the POCO's `hakios.goodix.c` is GENI **SPI**; fajita touch is GENI **I²C**.
+  HakiOS has no GENI-I²C transport yet, so the touch port is a new driver (`hakios.synaptics.c`):
+  GENI-I²C bring-up (GCC clock vote for the a90000 SE + TLMM i2c pinmux + RPMh rail votes) plus the
+  RMI4 protocol (PDT scan, F01 device control, F11/F12 2D touch), feeding `hakios_touch_post()`.
 
 ## Fingerprint (later)
 - Goodix optical in-display (`goodix,fingerprint` / `goodix_fp`); firmware `gfp9508.*`, `gfp5288.*`,
