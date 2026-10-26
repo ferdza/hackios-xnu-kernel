@@ -40,7 +40,8 @@ struct hakios_touch {
 void hakios_touch_post(uint32_t type, uint32_t finger, uint32_t x, uint32_t y);
 void hakios_input_init(void);
 void hakios_virtio_input_init(void);   /* boot-arg virtio_input=1: QEMU's virtio pointer and keyboard */
-void hakios_goodix_init(void);         /* boot-arg touchscreen=1: the phone's Goodix or FocalTech touch screen */
+void hakios_goodix_init(void);         /* boot-arg touchscreen=1: the POCO X5 Pro's Goodix or FocalTech touch screen */
+void hakios_oneplus6t_init(void);      /* boot-arg touchscreen=2: the OnePlus 6T's Synaptics S3706 (RMI4 over I2C) */
 void hakios_buttons_init(void);        /* boot-arg buttons=1: the phone's power and volume keys */
 void hakios_ufs_init(void);           /* ufs=2 to xnuloader: the phone's storage, read only, through the loader (ufs_shared_pa=) */
 void hakios_ufs_report(const char *when); /* where reading the storage has spent its time so far */
