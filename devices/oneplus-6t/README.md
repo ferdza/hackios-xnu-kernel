@@ -5,10 +5,10 @@ holds the first phone. The kernel, loader and user space know nothing about the 
 interrupts, power rails and firmware come from its device tree and its Android. This directory is
 that map for the 6T.
 
-> **Status: scaffold only.** No `fastboot boot` of HakiOS has been brought up on fajita yet. This
-> README is the plan and the known numbers. The hard, device-present work (UEFI build, pulling the
-> real device tree and firmware, rewriting the per-phone drivers) is listed below and still to do.
-> Build it with `make DEVICE=oneplus-6t ...` once the pieces here exist.
+> **Status: device characterised; no boot yet.** The real device tree and firmware listing have been
+> pulled from a fajita 6T (LineageOS) — `soc.args` and `HARDWARE.md` carry the verified numbers
+> (panel, touch, UFS, display, SoC addresses). Still to do: the fajita UEFI build and rewriting the
+> per-phone drivers (display → UFS → touch first). Build with `make DEVICE=oneplus-6t ...`.
 
 | What | Where / value |
 |---|---|
@@ -60,10 +60,12 @@ the phone's own device tree:
 devices/oneplus-6t/pull-soc.sh      # adb pull /sys/firmware/fdt, then tools/soc-args.py -> soc.args
 ```
 
-**This file is intentionally not committed yet.** The run scripts auto-pick `devices/*/soc.args`,
-so a half-verified file here would hijack a POCO build. `soc.args.sdm845-reference` in this
-directory holds the best-known SDM845 values as a *reference only* (it is not read by any script);
-confirm them against `pull-soc.sh` output on a real 6T before renaming anything to `soc.args`.
+**`soc.args` is now populated from a real fajita device tree** (see `HARDWARE.md` for every value and
+where it came from). `soc.args.sdm845-reference` is kept only as the earlier best-guess; the live
+file supersedes it (and corrected `soc_rsc` from `0x179c0000` to the real `0x179e0000`). Note the run
+scripts auto-pick `devices/*/soc.args` alphabetically, and `oneplus-6t` sorts before `poco-x5-pro`;
+if you ever build for the POCO from this fork, pass `SOC_ARGS=devices/poco-x5-pro/soc.args` (or
+`DEVICE=poco-x5-pro`) so you don't get the 6T's addresses.
 
 ### Known SDM845 vs POCO (SM7325) divergences — read before trusting any address
 
