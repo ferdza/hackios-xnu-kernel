@@ -16,28 +16,18 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 [x] 2. make images .......... OK
 [x] 3. make loader .......... OK (loader.efi)
 [x] 3. setup.sh --stage1 .... OK (tcsh buildé, availability.pl créé)
-🚩 3. make kernel ........... erreur « init_sysent.c ... \(sy_call_t » (mawk de Debian) :
-                             le .c foireux est mis en cache, gawk seul ne suffit pas. Fais :
-                               sed -i 's/\\(sy_call_t \*\\)/(sy_call_t *)/g' \
-                                 xnu-src/xnu-8796.121.2/bsd/kern/makesyscalls.sh
-                               rm -rf xnu-src/xnu-8796.121.2/BUILD   (garde loader.efi + images)
-                               make kernel
-                             succès = ça finit sur  check_all_exports  (voir étape 3)
-    (si le LD final dit « ld64: Cannot fork » = plus assez de RAM/process au link :
-     relance  make kernel  -- les .o sont en cache, le link tourne seul ; sinon  make kernel JOBS=1,
-     monte  ulimit -u, ou ajoute du swap. Pas un bug du port.)
-[ ] 4. UEFI fajita
+[~] 3. make kernel ........... OPTIONNEL pour le 1er boot : xl prend prebuilt/mach.* tout seul si
+                             aucun kernel n'est buildé. Le kernel custom n'ajoute QUE le driver
+                             touch (= milestone 4). Linker XNU veut ~13 Go RAM -> sur 16 Go avec un
+                             bureau ouvert ça passe pas (« ld64: Cannot fork »). Pour le builder
+                             plus tard : TTY nu (bureau tué) + make kernel JOBS=1, ou linker lld.
+🚩 4. UEFI fajita ........... TA SUITE
 [ ] 5. firmware (make DEVICE=oneplus-6t firmware)
-[ ] 6. boot sur le tél
+[ ] 6. boot sur le tél  (make DEVICE=oneplus-6t phone ARGS="touchscreen=2" -- prend le kernel prebuilt)
 [ ] 7. m'envoyer le log
 ```
 
-**Ta prochaine commande, juste celle-là :**
-```sh
-xnu-deps/setup.sh --stage1 && make kernel
-```
-Si `make kernel` finit sur `check_all_exports` → **c'est normal, c'est gagné** (voir étape 3).
-Si ça meurt ailleurs → colle-moi la sortie.
+**Ta prochaine commande :** l'UEFI (étape 4) -- pas besoin du kernel, le prebuilt suffit pour booter.
 
 ---
 
@@ -92,6 +82,13 @@ make images       # construit userland/root.apfs et userland/system.apfs
 ---
 
 ## 3. Construire le kernel + le loader
+
+> **Raccourci :** le kernel est **optionnel** pour un premier boot. `xl` retombe sur
+> `prebuilt/mach.development.bcm2837` si tu n'en builds pas un. Le kernel custom n'ajoute que le
+> driver touch (`hakios.oneplus6t.c`, milestone 4). Linker XNU demande ~13 Go de RAM : sur une
+> machine 16 Go avec un bureau ouvert, le link échoue (« ld64: Cannot fork »). Pour le 1er boot,
+> **saute cette étape** (garde juste `make loader`) et va à l'UEFI. Pour builder le kernel plus tard :
+> un TTY nu (bureau fermé) libère assez de RAM pour `make kernel JOBS=1`, ou passe le link sur lld.
 
 **D'abord, une fois, cette commande** (elle finit de préparer le SDK — crée `availability.pl`) :
 ```sh
