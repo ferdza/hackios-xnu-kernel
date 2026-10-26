@@ -15,9 +15,11 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 [x] 0. Outils installés (apt + theos)
 [x] 2. make images .......... OK (root.apfs / system.apfs faits)
 [x] 3. make loader .......... OK (loader.efi construit)
-🚩 3. make kernel ........... BLOQUÉ : setup.sh --stage1 meurt sur « tcsh did not build »
-                             -> manque les headers ncurses :  sudo apt install libncurses-dev
-                             puis relance  xnu-deps/setup.sh --stage1  (il ira jusqu'à availability.pl)
+🚩 3. make kernel ........... BLOQUÉ : setup.sh --stage1 meurt en compilant tcsh.
+                             Il faut ses libs :  sudo apt install libncurses-dev libcrypt-dev
+                             (ncurses = « tcsh did not build » ; crypt = « référence indéfinie crypt »)
+                             puis  xnu-deps/setup.sh --stage1  (va jusqu'à availability.pl)
+                             si tcsh re-plante : rm -rf xnu-deps/tcsh && xnu-deps/setup.sh --stage1
 [ ] 4. UEFI fajita
 [ ] 5. firmware (make DEVICE=oneplus-6t firmware)
 [ ] 6. boot sur le tél
@@ -43,7 +45,7 @@ sudo pacman -S --needed base-devel git curl clang lld python perl xz nasm llvm a
 ```sh
 sudo apt install build-essential git curl clang lld python3 perl xz-utils nasm llvm \
   gcc-aarch64-linux-gnu python3-pip python3-venv android-tools-adb android-tools-fastboot \
-  bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse libncurses-dev
+  bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse libncurses-dev libcrypt-dev
 ```
 > Les derniers sont indispensables au build du kernel/loader : sans eux tu auras `bison: Aucun
 > fichier`, `'uuid/uuid.h' file not found`, `no LZFSE decoder`, ou `tcsh did not build` (ça =
