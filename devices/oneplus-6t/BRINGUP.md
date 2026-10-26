@@ -12,14 +12,13 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 ## 📍 OÙ TU EN ES (mis à jour le 2026-10-27)
 
 ```
-[x] 0. Outils installés (apt + theos)
-[x] 2. make images .......... OK (root.apfs / system.apfs faits)
-[x] 3. make loader .......... OK (loader.efi construit)
-🚩 3. make kernel ........... BLOQUÉ : setup.sh --stage1 meurt en compilant tcsh.
-                             Il faut ses libs :  sudo apt install libncurses-dev libcrypt-dev
-                             (ncurses = « tcsh did not build » ; crypt = « référence indéfinie crypt »)
-                             puis  xnu-deps/setup.sh --stage1  (va jusqu'à availability.pl)
-                             si tcsh re-plante : rm -rf xnu-deps/tcsh && xnu-deps/setup.sh --stage1
+[x] 0. Outils installés (apt + theos)   <- ajoute gawk ! (voir étape 0)
+[x] 2. make images .......... OK
+[x] 3. make loader .......... OK (loader.efi)
+[x] 3. setup.sh --stage1 .... OK (tcsh buildé, availability.pl créé)
+🚩 3. make kernel ........... si erreur « init_sysent.c ... \(sy_call_t » -> sudo apt install gawk
+                             (mawk de Debian casse la génération ; gawk la répare) puis  make kernel
+                             succès = ça finit sur  check_all_exports  (voir étape 3)
 [ ] 4. UEFI fajita
 [ ] 5. firmware (make DEVICE=oneplus-6t firmware)
 [ ] 6. boot sur le tél
@@ -45,8 +44,13 @@ sudo pacman -S --needed base-devel git curl clang lld python perl xz nasm llvm a
 ```sh
 sudo apt install build-essential git curl clang lld python3 perl xz-utils nasm llvm \
   gcc-aarch64-linux-gnu python3-pip python3-venv android-tools-adb android-tools-fastboot \
-  bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse libncurses-dev libcrypt-dev
+  bison flex m4 autoconf automake libtool pkg-config uuid-dev lzfse libncurses-dev libcrypt-dev gawk
 ```
+> `gawk` est important sur Debian : l'`awk` par défaut (mawk) casse la génération de la table
+> d'appels système (`init_sysent.c` sort `\(sy_call_t *\)` au lieu de `(sy_call_t *)`). Installer
+> `gawk` le met par défaut et règle ça. (Le dépôt a aussi un fix dans `hakios.patch` pour que mawk
+> passe, mais il ne s'applique qu'à un arbre `xnu-src/` **frais** — si le tien est déjà déplié,
+> `gawk` est la voie rapide.)
 > Les derniers sont indispensables au build du kernel/loader : sans eux tu auras `bison: Aucun
 > fichier`, `'uuid/uuid.h' file not found`, `no LZFSE decoder`, ou `tcsh did not build` (ça =
 > `libncurses-dev` manquant, puisque `setup.sh` compile tcsh et s'arrête dessus). Si tu as lancé un
