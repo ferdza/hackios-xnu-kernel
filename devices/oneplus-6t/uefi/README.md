@@ -1,50 +1,72 @@
 # UEFI for the OnePlus 6T (fajita)
 
-HakiOS boots XNU over a per-phone UEFI, the same role the POCO's Mu-Silicium port plays in
-`../../poco-x5-pro/uefi/`. The 6T needs its own. There is no upstream Mu-Silicium fajita target, so
-there are two realistic paths:
+HakiOS boots XNU over a per-phone UEFI, the role the POCO's Mu-Silicium port plays in
+`../../poco-x5-pro/uefi/`. The 6T needs its own. Mu-Silicium has no fajita target upstream, **but it
+has `enchiladaPkg` (the OnePlus 6)** — the same SoC (SDM845, Qualcomm "Napali", `NapaliPkg`) and
+near-identical board. So the fajita port is the OnePlus 6 package with the 6T's panel size, board id
+and names changed. `make-fajita-pkg.sh` here does exactly that derivation (this is the same approach
+UniXNU-fajita takes).
 
-## Path A — Mu-Silicium, derived from the OnePlus 6 (enchilada)
+## Step 1 — generate `fajitaPkg` (done by the script, verified)
 
-The 6 and 6T are near-identical SDM845 boards sharing `sdm845-oneplus-common.dtsi`. Start from the
-`enchilada` Mu-Silicium device and change only what the 6T differs in:
+```sh
+devices/oneplus-6t/uefi/make-fajita-pkg.sh
+```
 
-- **Panel**: `samsung,sofef00` (1080×2280) → **`samsung,s6e3fc2x01`** (1080×2340).
-- **ABL board id**: `<8 0 17819 22>` → **`<8 0 18801 41>`**.
-- **Splash / framebuffer region**: confirm the 6T splash base (UniXNU uses `0x9d400000`) and the
-  FD base/size (`0x9fc00000` / `0x300000`, unchanged from the 6).
+It clones Mu-Silicium to `Mu-Silicium/` at the repo root (shared with the POCO port; it is
+git-ignored), copies `Platforms/OnePlus/enchiladaPkg` → `fajitaPkg`, and applies the 6T's values.
+What it changes, from the real device tree (`../HARDWARE.md`):
 
-This mirrors what UniXNU-fajita's `scripts/make-fajita-uefi.py` does (it derives a fajita UEFI from
-the enchilada port). Keep this directory's layout parallel to the POCO's: an `apply.sh` that clones
-Mu-Silicium and applies a `mu-silicium.patch`, an `export.sh` that saves it back, and the built
-`SILICIUM_UEFI.fd` + `BootShim.bin` landing in `../prebuilt/`.
+| In `fajita.dsc` | enchilada (OnePlus 6) | fajita (6T) |
+|---|---|---|
+| `PLATFORM_NAME` / GUID | enchilada / `F8A6C376-…` | fajita / `F5859963-A198-40FE-BA5E-20C2B1B07AC7` |
+| `PcdFrameBufferHeight` | 2280 (`sofef00`) | **2340** (`s6e3fc2x01`) |
+| `PcdFrameBufferWidth` | 1080 | 1080 (unchanged) |
+| `PcdSmbiosSystemModel` | `"6"` | `"6T"` |
+| `PcdSmbiosSystemRetailModel` | `"enchilada"` | `"fajita"` |
+| `PcdSmbiosSystemRetailSku` | `"A6003"` | `"A6013"` |
+| `PcdSmbiosSystemBoardModel` | `"17819"` | **`"18801"`** (matches `androidboot.project_name`) |
 
-## Path B — edk2-sdm845 (Renegade Project)
+Unchanged because the 6 and 6T share them (confirmed in the OnePlus 6 memory map): the display/splash
+region `0x9D400000`, the FD region `0x9FC00000`, `NapaliPkg` as the SoC package. `DeviceBuild.py`
+and the `.dec`/`.fdf` are renamed and re-scoped to `fajita` automatically. The 6T's own device tree
+(`../prebuilt/device-tree.dtb` if present, or pass one as an argument) is shipped as the UEFI DTB.
 
-The mature community UEFI for SDM845 phones (including the 6T) is **edk2-sdm845**. It already boots
-on fajita and exposes standard UEFI (GOP framebuffer, block IO). If the HakiOS loader only needs a
-conformant UEFI + a device tree handoff, this is the lower-risk way to first light. The cost is that
-it is a different edk2 base than the rest of HakiOS's device tooling assumes, so the prebuilt/boot
-plumbing (`mkbootimg.py`, the BootShim) may need adapting.
+## Step 2 — build it
 
-## ABL `fastboot boot` quirks (both paths)
+Packages as in Mu-Silicium's `setup_env.sh` (Arch: `git base-devel lld nasm clang llvm
+aarch64-linux-gnu-gcc python python-pip python-virtualenv`).
 
-The 6T's stock ABL is fussy, per UniXNU-fajita:
+```sh
+cd Mu-Silicium
+python3 -m venv venv && venv/bin/pip install -r pip-requirements.txt
+source venv/bin/activate
+python3 build_uefi.py -d fajita -r RELEASE    # -> Build/fajitaPkg/RELEASE_CLANGPDB/FV/SILICIUM_UEFI.fd
+```
 
-- It **refuses `fastboot boot`** if an image already sits on the active slot's boot partition, or if
-  the active slot's retry count has hit 0. Workaround: `fastboot --set-active=b` (or `set_active b`)
-  before each boot.
-- It **rejects large ramdisks**. UniXNU ships an empty ramdisk in the boot image and puts the real
-  payload on a data volume (`system_a`). HakiOS uploads its ramdisk through `xl ramdisk` rather than
-  baking it into the boot image, which should sidestep this — verify on first bring-up.
+(The POCO README's `mu_nasm`/Mono note applies here too if the build complains about nasm.)
 
-Nothing here is flashed in the HakiOS flow: the loader is RAM-booted with `xl`, and a reboot returns
-the phone to Android. Charging does **not** run while UEFI/XNU is up (inherited OnePlus-6 charger
-config is unverified on the 6T) — keep the battery topped up during bring-up sessions.
+## Step 3 — the HakiOS XnuLoader layer (TODO, shared with the POCO)
 
-## Files to add here (todo)
+The base `fajitaPkg` boots UEFI; it does not yet start XNU. The POCO port adds, on top of its package,
+the HakiOS integration from `../../poco-x5-pro/uefi/` — `mu-silicium.patch` plus `files/`:
+- `BootShim/BootShim.S`: copies the "XNUP" container that sits behind the UEFI image to `0xF0000000`.
+- `Silicon/Silicium/SiliciumPkg/Library/BootManagerLib/XnuLoader.[ch]`: starts the XNU loader from
+  that container instead of showing a boot menu.
 
-- `apply.sh`, `export.sh`, `mu-silicium.patch` (Path A), or a thin `fetch-edk2.sh` (Path B)
-- built artifacts exported to `../prebuilt/`: `SILICIUM_UEFI.fd`, `BootShim.bin`, `device-tree.dtb`
-  (the 6T's own, from `/sys/firmware/fdt` or mainline `sdm845-oneplus-fajita.dts`), `ramdisk`,
-  `mkbootimg.py`
+These are **SoC/loader-level, not panel-level**, so they should port to fajita with little change.
+The task: apply that same patch + `XnuLoader.[ch]` onto the Mu-Silicium tree after Step 1, confirm
+the `BootShim` load address and the container offset against the 6T memory map (FD `0x9FC00000`,
+splash `0x9D400000` — both equal to the OnePlus 6's, so likely unchanged), rebuild, and
+`export.sh`-style snapshot it back into this directory as `fajita`'s own `mu-silicium.patch`/`files/`.
+
+## ABL `fastboot boot` quirks (both the base and the HakiOS build)
+
+Per UniXNU-fajita, the 6T's stock ABL:
+- **refuses `fastboot boot`** if an image sits on the active slot's boot partition, or if the active
+  slot's retry count is 0 → `fastboot --set-active=b` before each boot;
+- **rejects large ramdisks** → HakiOS uploads its ramdisk through `xl ramdisk` rather than baking it
+  into the boot image, which should sidestep this; verify on first bring-up.
+
+Nothing is flashed: the loader is RAM-booted with `xl`, and a reboot returns the phone to Android.
+Charging does not run while UEFI/XNU is up — keep the battery topped up during bring-up.

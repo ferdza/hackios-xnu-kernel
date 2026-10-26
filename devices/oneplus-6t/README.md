@@ -35,11 +35,10 @@ numbers come from — that is the checklist.
 
 ### Milestones (in order; each is a real sub-project)
 
-1. **UEFI for fajita.** The POCO uses a Mu-Silicium port (`uefi/`). Mu-Silicium has no upstream
-   fajita target. There are two paths: (a) derive one from the OnePlus 6 (`enchilada`) Mu-Silicium
-   port, changing the panel to `s6e3fc2x01`, the ABL board-id to `<8 0 18801 41>` and the splash
-   region; or (b) use the mature **edk2-sdm845** (Renegade Project) build that already runs on the
-   6T. See `uefi/README.md`.
+1. **UEFI for fajita.** Derived from Mu-Silicium's `enchiladaPkg` (OnePlus 6, same SDM845/NapaliPkg):
+   `uefi/make-fajita-pkg.sh` generates a `fajitaPkg` with the 6T's panel (`s6e3fc2x01`, 2340 high),
+   board id (18801) and the real device tree, verified. Remaining: build it, then apply the HakiOS
+   XnuLoader/BootShim layer on top (shared with the POCO). See `uefi/README.md`.
 2. **Boot to the loader + framebuffer.** Get XNU to the point the POCO reaches: VM, scheduler,
    IOKit, AMFI, Sandbox up, and a framebuffer on the panel. Gating drivers: display
    (`hakios.*framebuffer*`), then the SDM845 **SoC addresses** below.
