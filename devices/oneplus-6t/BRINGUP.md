@@ -9,6 +9,29 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 
 ---
 
+## 📍 OÙ TU EN ES (mis à jour le 2026-10-27)
+
+```
+[x] 0. Outils installés (apt + theos)
+[x] 2. make images .......... OK (root.apfs / system.apfs faits)
+[x] 3. make loader .......... OK (loader.efi construit)
+🚩 3. make kernel ........... BLOQUÉ : lance d'abord  xnu-deps/setup.sh --stage1
+                             (sinon erreur « availability.pl ... not found »)
+[ ] 4. UEFI fajita
+[ ] 5. firmware (make DEVICE=oneplus-6t firmware)
+[ ] 6. boot sur le tél
+[ ] 7. m'envoyer le log
+```
+
+**Ta prochaine commande, juste celle-là :**
+```sh
+xnu-deps/setup.sh --stage1 && make kernel
+```
+Si `make kernel` finit sur `check_all_exports` → **c'est normal, c'est gagné** (voir étape 3).
+Si ça meurt ailleurs → colle-moi la sortie.
+
+---
+
 ## 0. Les outils (une seule fois)
 
 **Arch :**
@@ -55,9 +78,19 @@ make images       # construit userland/root.apfs et userland/system.apfs
 
 ## 3. Construire le kernel + le loader
 
+**D'abord, une fois, cette commande** (elle finit de préparer le SDK — crée `availability.pl`) :
 ```sh
-make kernel       # applique les sources XNU d'Apple + HakiOS, puis compile (xnu/apply.sh, xnu-deps/setup.sh, xnu-build.sh)
-make loader       # le bootloader HakiOS
+xnu-deps/setup.sh --stage1
+```
+> ⚠️ Piège : `make kernel` ne relance **pas** `setup.sh` tout seul une fois `xnu-clang` construit.
+> Si un premier build a laissé un SDK incomplet, tu auras `availability.pl ... not found`. Cette
+> commande règle ça. Elle est sans risque à relancer. Vérifie après :
+> `ls xnu-deps/sdk/iPhoneOS16.5.xnu.sdk/usr/local/libexec/availability.pl`
+
+Ensuite :
+```sh
+make kernel       # applique les sources XNU d'Apple + HakiOS, puis compile (xnu-build.sh)
+make loader       # le bootloader HakiOS  (déjà fait chez toi -> loader.efi)
 ```
 > Normal : le build kernel finit **toujours** sur une erreur `check_all_exports` **après** avoir lié
 > le kernel. Regarde la date du fichier, pas le code de sortie. C'est pour ça que `-k` est là.
