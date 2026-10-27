@@ -3791,8 +3791,11 @@ usb_poll_command(void)
 	if (USB == NULL) {
 		return;         /* this run was not started over USB */
 	}
-	if (!usb_rx_queued && usb_connected && !EFI_ERROR(USB->send(USB_EP_OUT, 511, usb_rx_buf))) {
-		usb_rx_queued = 1;
+	if (!usb_rx_queued && usb_connected) {
+		memset(usb_rx_buf, 0, 512);     /* see usb_command_loop: clear bytes past a short packet */
+		if (!EFI_ERROR(USB->send(USB_EP_OUT, 511, usb_rx_buf))) {
+			usb_rx_queued = 1;
+		}
 	}
 	USB->handle_event(&msg, &size, &data);
 	if (msg == UsbDeviceEventDeviceStateChange) {
@@ -3825,6 +3828,16 @@ usb_command_loop(void)
 			usb_wait(0xff); /* returns on the next cable state change */
 			continue;
 		}
+		/*
+		 * Clear the receive buffer before each command. On fajita the USB controller (connected at
+		 * SuperSpeed, 1024-byte bulk max packet) reports a short packet's bytes_completed rounded up
+		 * past the real command length, so bytes after the command are stale. A cleared buffer makes
+		 * them NUL, so the command string ends where it should -- otherwise str_eq() on an exact
+		 * command like "getvar:product" sees trailing junk, fails, and the var reads as unknown
+		 * (which is why `fastboot getvar product` returned an empty value on the 6T while prefix
+		 * commands like "oem run" still matched). 512 covers the 127-byte command clamp below.
+		 */
+		memset(usb_rx_buf, 0, 512);
 		n = usb_rx(usb_rx_buf, 511);
 		if (n <= 0) {
 			continue;

@@ -36,10 +36,13 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 [x] 6d. crash loader identifié : « Synchronous Exception at 0xA10026D8 ». Le loader croyait que tout
                              ce qui n'est pas la POCO = QEMU et appelait ramfb_phone_screen() ->
                              écriture dans le fw_cfg QEMU (0x09020000), unmapped sur vrai tél -> abort.
-🚩 6e. FIX dans loader.c : platform_fajita (valeurs SDM845) + la branche display utilise le GOP
-                             directement pour le framebuffer fajita (0x9D400000) au lieu de ramfb.
-                             -> `make loader`, puis reboot. (USB = protocole UEFI, devrait marcher.)
-[ ] 7. loader up sur USB -> xl enter/ramdisk/run -> LE LOG (make DEVICE=oneplus-6t phone)
+[x] 6e. FIX display dans loader.c : platform_fajita + framebuffer GOP (0x9D400000). OK, le loader
+                             passe l'écran, affiche `platform fajita`, `usb: started`.
+[x] 6f. USB énumère (fastboot devices -> xnuloader) mais `getvar product` vide -> xl ne détecte pas.
+                             Cause : short packet USB sur-rapporté (SuperSpeed) -> cmd avec octets
+                             stale -> str_eq échoue. FIX : zéroter usb_rx_buf avant chaque commande.
+🚩 6g. rebuild loader -> `./xl state` doit dire `loader`.
+[ ] 7. xl ramdisk + xl run -> LE LOG (le but V1)
 ```
 
 **Ta prochaine étape :** lire le dump de l'exception UEFI à l'écran (photo) — PC, nom de module, ESR,

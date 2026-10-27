@@ -20,10 +20,17 @@ sous LineageOS 17.1 avec `adb root` (daemon en root ; **pas de binaire `su`**).
 2. ✅ **ABL saute dans l'image** via `fastboot boot` — a nécessité le **vrai dtb 6T** (voir plus bas).
 3. ✅ **UEFI boote** : splash « Project Silicium » à l'écran.
 4. ✅ **Loader HakiOS démarre** : « == XNULOADER v3 == » + `CurrentEL=1 MIDR=517f803c ...`.
-5. 🚩 **EN COURS** : le loader fautait (`Synchronous Exception at 0xA10026D8`) car il prenait fajita
-   pour QEMU et écrivait dans le fw_cfg QEMU. **Corrigé** (commit, `platform_fajita` + display GOP).
-   À re-tester : le loader doit passer l'écran display et venir sur USB pour que `xl` le voie.
-6. ⬜ **Prochain** : loader up sur USB → `xl ramdisk` + `xl run` → premier log du kernel (le but V1).
+5. ✅ **Crash display corrigé** : le loader prenait fajita pour QEMU (ramfb → fw_cfg). Fix :
+   `platform_fajita` + branche display sur le framebuffer `0x9D400000` (GOP direct). Écran confirme :
+   `display 1080 x 2340 at 9d400000` / `platform fajita` / `usb: started`.
+6. ✅ **USB énumère** : `fastboot devices` → `xnuloader   fastboot`. Mais `getvar product` renvoyait
+   vide → `xl` ne détectait pas le loader. Cause : le contrôleur USB fajita (SuperSpeed, bulk max
+   packet 1024) sur-rapporte la longueur d'un short packet → `cmd` reçu avec des octets stale →
+   `str_eq(var,"product")` échoue. **Fix** : zéroter `usb_rx_buf` avant chaque réception de commande
+   (usb_command_loop + usb_poll_command). Les commandes à préfixe (`oem run`, `download:`) marchaient
+   déjà ; seules les égalités exactes (`getvar product`, `max-download-size`) cassaient.
+7. 🚩 **EN COURS** : rebuild loader, re-tester. `./xl state` doit dire `loader` → `xl ramdisk` +
+   `xl run` → **premier log du kernel** (le but V1).
 
 ## ⚡ LE POINT CLÉ : comment booter et VOIR l'écran (OnePlus fait autrement)
 
