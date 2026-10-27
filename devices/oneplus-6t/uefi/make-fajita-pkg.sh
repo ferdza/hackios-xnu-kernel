@@ -67,24 +67,34 @@ if [ -n "$dtb" ] && [ -f "$dtb" ]; then
 	echo "make-fajita-pkg.sh: shipped the 6T's own device tree ($dtb) as the UEFI DTB"
 fi
 
-# 6. ACPI tables. They live in the Silicium-ACPI submodule, not in the package, and fajita.dsc/.fdf
-#    reference them by device-relative path ("fajita/AcpiTables.inf" after step 3's rename). That path
-#    resolves against Silicium-ACPI/Platforms/OnePlus, so a fajita/ dir MUST exist there or PreBuild's
-#    OverrideValidation dies ("Failed to convert Edk2Relative Path ... fajita/AcpiTables.inf"). The 6
-#    and 6T share the Napali SoC tables, so derive fajita's from enchilada's (the .inf carries only a
-#    GUID and shared Napali/Common AML paths -- no device string -- so a copy is exact).
-ACPI=$MU/Silicium-ACPI/Platforms/OnePlus
-if [ -d "$ACPI/enchilada" ]; then
-	[ "$force" = 1 ] && rm -rf "$ACPI/fajita"
-	if [ ! -d "$ACPI/fajita" ]; then
-		cp -r "$ACPI/enchilada" "$ACPI/fajita"
-		grep -rl enchilada "$ACPI/fajita" 2>/dev/null | while read -r f; do sed -i 's/enchilada/fajita/g' "$f"; done
-		echo "make-fajita-pkg.sh: derived fajita ACPI tables from enchilada ($ACPI/fajita)"
+# 6. Sibling dirs in the submodules that the renamed .dsc/.fdf/.inc now point at. The package only
+#    renames references; the referenced trees live in submodules keyed by device name and must gain a
+#    fajita/ sibling or the build fails:
+#      - Silicium-ACPI/Platforms/OnePlus/<device>/AcpiTables.inf  (else PreBuild OverrideValidation
+#        dies: "Failed to convert Edk2Relative Path ... fajita/AcpiTables.inf")
+#      - Binaries/<device>/QcomPkg/...  the Qualcomm prebuilt DXE drivers listed in Include/*.inc
+#        (else "File/directory not found: Binaries/fajita/QcomPkg/Drivers/EnvDxe/EnvDxe.inf")
+#    The 6 and 6T are the same SDM845 "Napali" SoC, so the OnePlus 6's files bootstrap the 6T. (The
+#    6T's own QcomPkg blobs, extracted from its OxygenOS, are a later milestone; enchilada's get a
+#    first boot.) Neither tree carries the device name in a text file, so a copy is exact; a text-only
+#    rename guards the rare case and never touches the prebuilt binaries.
+derive_sibling() {   # derive_sibling <submodule-subdir-under-MU> <description>
+	local base=$MU/$1 desc=$2
+	if [ ! -d "$base/enchilada" ]; then
+		echo "make-fajita-pkg.sh: WARNING: no $base/enchilada ($desc -- submodule not initialised?)" >&2
+		echo "make-fajita-pkg.sh:   run: git -C $MU submodule update --init --recursive" >&2
+		return
 	fi
-else
-	echo "make-fajita-pkg.sh: WARNING: no $ACPI/enchilada (Silicium-ACPI submodule not initialised?)" >&2
-	echo "make-fajita-pkg.sh:   run: git -C $MU submodule update --init --recursive" >&2
-fi
+	[ "$force" = 1 ] && rm -rf "$base/fajita"
+	if [ ! -d "$base/fajita" ]; then
+		cp -r "$base/enchilada" "$base/fajita"
+		grep -rlI --include='*.inf' --include='*.inc' --include='*.dsc' --include='*.dec' --include='*.txt' \
+			enchilada "$base/fajita" 2>/dev/null | while read -r f; do sed -i 's/enchilada/fajita/g' "$f"; done
+		echo "make-fajita-pkg.sh: derived fajita $desc from enchilada ($base/fajita)"
+	fi
+}
+derive_sibling Silicium-ACPI/Platforms/OnePlus "ACPI tables"
+derive_sibling Binaries                        "Qualcomm prebuilt binaries"
 
 echo "make-fajita-pkg.sh: wrote $F"
 echo "make-fajita-pkg.sh: review fajita.dsc, then build:"

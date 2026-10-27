@@ -32,13 +32,22 @@ region `0x9D400000`, the FD region `0x9FC00000`, `NapaliPkg` as the SoC package.
 and the `.dec`/`.fdf` are renamed and re-scoped to `fajita` automatically. The 6T's own device tree
 (`../prebuilt/device-tree.dtb` if present, or pass one as an argument) is shipped as the UEFI DTB.
 
-The script also derives the **ACPI tables**: `fajita.dsc`/`fajita.fdf` reference them by
-device-relative path (`fajita/AcpiTables.inf`), which resolves inside the **Silicium-ACPI** submodule
-(`Silicium-ACPI/Platforms/OnePlus/`), not in the package. The rename alone would leave that path
-dangling and PreBuild's OverrideValidation would crash (`Failed to convert Edk2Relative Path ...
-fajita/AcpiTables.inf`). So the script copies `Silicium-ACPI/Platforms/OnePlus/enchilada` →
-`fajita`; the `.inf` holds only a GUID and shared `Napali`/`Common` AML (the Napali SoC tables the 6
-and 6T share), so the copy is exact.
+The script also derives the two **submodule trees** the package references by device name (the
+package only renames the references; the trees themselves live in submodules keyed by device):
+
+- **ACPI tables** — `fajita.dsc`/`fajita.fdf` reference `fajita/AcpiTables.inf`, which resolves
+  inside **Silicium-ACPI** (`Silicium-ACPI/Platforms/OnePlus/`). A missing `fajita/` makes PreBuild's
+  OverrideValidation crash (`Failed to convert Edk2Relative Path ... fajita/AcpiTables.inf`). The
+  `.inf` holds only a GUID and shared `Napali`/`Common` AML (the Napali SoC tables the 6 and 6T
+  share).
+- **Qualcomm prebuilt binaries** — `Include/{APRIORI,DXE,RAW}.inc` list ~36 QcomPkg DXE drivers at
+  `Binaries/fajita/QcomPkg/...`, which resolve inside the **Binaries** submodule
+  (`Project-Silicium/Device-Binaries`). A missing `fajita/` makes the build fail with
+  `File/directory not found ... Binaries/fajita/QcomPkg/Drivers/EnvDxe/EnvDxe.inf`.
+
+Both are the same SDM845 "Napali" SoC on the 6 and 6T, so the script copies enchilada's → `fajita`
+(no text file in either tree carries the device name, so the copy is exact). Extracting the 6T's own
+QcomPkg blobs from its OxygenOS is a later milestone; enchilada's get it to a first boot.
 
 ## Step 2 — build it
 
