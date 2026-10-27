@@ -23,9 +23,10 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
                              plus tard : TTY nu (bureau tué) + make kernel JOBS=1, ou linker lld.
 [x] 4a. make-fajita-pkg + add-xnuloader ... OK (fajitaPkg généré, couche XnuLoader appliquée)
 [x] 4b. mono-devel installé ... OK (l'erreur Mono a disparu)
-🚩 4c. build_uefi.py ......... NuGet n'arrive pas à installer mu_nasm (Mono OK mais TLS/réseau KO,
-                             cert-sync absent). CONTOURNEMENT retenu : neutraliser le ext_dep NuGet
-                             et utiliser le nasm d'apt (set_path). Voir le bloc 🩹🩹 de l'étape 4.
+[x] 4c. nasm : NuGet KO -> contournement nasm d'apt (bloc 🩹🩹). OK, build passe les dépendances.
+🚩 4d. build_uefi.py ......... au PreBuild : dossier ACPI `fajita` manquant (généré par l'ancien
+                             make-fajita-pkg). Crée-le (bloc 🩹🩹🩹 de l'étape 4), puis le build doit
+                             sortir SILICIUM_UEFI.fd.
 [-] 5. firmware ............. OPTIONNEL pour le 1er boot (a630/wifi/modem ne sont pas dans le chemin
                              critique avec touchscreen=2). Tél en Android, et depuis la RACINE.
 [ ] 6. boot       (make DEVICE=oneplus-6t phone ARGS="touchscreen=2"  <- RACINE ; kernel prebuilt)
@@ -184,6 +185,20 @@ cd ..                                          # <- RETOUR À LA RACINE avant le
 > Rien d'autre à fetcher (le log ne liste qu'**une** dépendance en échec, `mu_nasm` ; les autres sont
 > OK). `build_uefi.py` ne touche pas à ce `.yaml`, donc la neutralisation tient — sauf si tu refais un
 > `git submodule update`, qui le restaurerait (re-fais le `mv` si ça arrive).
+
+> 🩹🩹🩹 **`Failed to convert Edk2Relative Path ... fajita/AcpiTables.inf`** au PreBuild
+> (OverrideValidation). Les tables ACPI sont dans le submodule **Silicium-ACPI**, pas dans le paquet,
+> et `make-fajita-pkg.sh` les dérive maintenant tout seul. Mais si ton `fajitaPkg` a été généré par
+> une **ancienne** version du script (avant ce fix), le dossier ACPI `fajita` manque. Crée-le (les 6
+> et 6T partagent les tables Napali du SoC) :
+> ```sh
+> cd Mu-Silicium
+> cp -r Silicium-ACPI/Platforms/OnePlus/enchilada Silicium-ACPI/Platforms/OnePlus/fajita
+> source venv/bin/activate && python3 build_uefi.py -d fajita -r RELEASE && cd ..
+> ```
+> (Ou, plus propre : relance `devices/oneplus-6t/uefi/make-fajita-pkg.sh --force` qui fait ça + le
+> reste. Il faut juste refaire `add-xnuloader.sh` après, et re-`mv` le `nasm_ext_dep.yaml` si tu étais
+> passé par le contournement nasm.)
 
 > Si tu as déjà lancé `make-fajita-pkg.sh` **avant** de poser ton dtb, relance-le avec `--force` pour
 > réembarquer le bon. Tu n'as pas à retoucher `add-xnuloader.sh` (il est idempotent).

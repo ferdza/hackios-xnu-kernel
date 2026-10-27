@@ -67,6 +67,25 @@ if [ -n "$dtb" ] && [ -f "$dtb" ]; then
 	echo "make-fajita-pkg.sh: shipped the 6T's own device tree ($dtb) as the UEFI DTB"
 fi
 
+# 6. ACPI tables. They live in the Silicium-ACPI submodule, not in the package, and fajita.dsc/.fdf
+#    reference them by device-relative path ("fajita/AcpiTables.inf" after step 3's rename). That path
+#    resolves against Silicium-ACPI/Platforms/OnePlus, so a fajita/ dir MUST exist there or PreBuild's
+#    OverrideValidation dies ("Failed to convert Edk2Relative Path ... fajita/AcpiTables.inf"). The 6
+#    and 6T share the Napali SoC tables, so derive fajita's from enchilada's (the .inf carries only a
+#    GUID and shared Napali/Common AML paths -- no device string -- so a copy is exact).
+ACPI=$MU/Silicium-ACPI/Platforms/OnePlus
+if [ -d "$ACPI/enchilada" ]; then
+	[ "$force" = 1 ] && rm -rf "$ACPI/fajita"
+	if [ ! -d "$ACPI/fajita" ]; then
+		cp -r "$ACPI/enchilada" "$ACPI/fajita"
+		grep -rl enchilada "$ACPI/fajita" 2>/dev/null | while read -r f; do sed -i 's/enchilada/fajita/g' "$f"; done
+		echo "make-fajita-pkg.sh: derived fajita ACPI tables from enchilada ($ACPI/fajita)"
+	fi
+else
+	echo "make-fajita-pkg.sh: WARNING: no $ACPI/enchilada (Silicium-ACPI submodule not initialised?)" >&2
+	echo "make-fajita-pkg.sh:   run: git -C $MU submodule update --init --recursive" >&2
+fi
+
 echo "make-fajita-pkg.sh: wrote $F"
 echo "make-fajita-pkg.sh: review fajita.dsc, then build:"
 echo "    cd $MU && python3 build_uefi.py -d fajita -r RELEASE"
