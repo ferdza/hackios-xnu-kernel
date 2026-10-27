@@ -31,11 +31,15 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
 [x] 6a. dtb 6T réel ......... OBLIGATOIRE. Sans lui l'ABL refuse de sauter (fastboot boot = OKAY mais
                              tél figé). Tiré via `adb root` + cat /sys/firmware/fdt (~500 Ko). OK.
 [x] 6b. fastboot boot ....... OK ! l'ABL saute enfin dans l'UEFI.
-🚩 6c. UEFI s'exécute ....... mais plante : « Synchronous Exception at 0x... » (crash EDK2/ArmPkg ->
-                             le cœur UEFI tourne). EN COURS : lire le dump (PC/module/ESR/FAR) pour
-                             savoir quel driver faute. Blobs Qualcomm empruntés à l'OnePlus 6 =
-                             suspect n°1 (un DXE device-specific qui tape un registre différent).
-[ ] 7. loader + kernel + log (une fois l'UEFI passé)
+[x] 6c. UEFI + loader démarrent ! Écran : splash « Project Silicium » + banner « == XNULOADER v3 == »
+                             + CurrentEL=1 MIDR=517f803c... => on est DANS le loader HakiOS.
+[x] 6d. crash loader identifié : « Synchronous Exception at 0xA10026D8 ». Le loader croyait que tout
+                             ce qui n'est pas la POCO = QEMU et appelait ramfb_phone_screen() ->
+                             écriture dans le fw_cfg QEMU (0x09020000), unmapped sur vrai tél -> abort.
+🚩 6e. FIX dans loader.c : platform_fajita (valeurs SDM845) + la branche display utilise le GOP
+                             directement pour le framebuffer fajita (0x9D400000) au lieu de ramfb.
+                             -> `make loader`, puis reboot. (USB = protocole UEFI, devrait marcher.)
+[ ] 7. loader up sur USB -> xl enter/ramdisk/run -> LE LOG (make DEVICE=oneplus-6t phone)
 ```
 
 **Ta prochaine étape :** lire le dump de l'exception UEFI à l'écran (photo) — PC, nom de module, ESR,

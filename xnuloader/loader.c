@@ -551,6 +551,20 @@ static const struct platform platform_redwood = {
 	.small_cores = 0x0f,
 };
 
+static const struct platform platform_fajita = {
+	/*
+	 * OnePlus 6T (SDM845 "Napali"). Same Qualcomm layout as redwood (SM7325): GICv3 at the same
+	 * bases (sdm845 intc@17a00000, redistributor at 0x17a60000), eight cores numbered in MPIDR's
+	 * second affinity field (DynamIQ-style, Aff1 = 0..7 with Aff0 = 0 -- sdm845.dtsi CPU regs run
+	 * 0x0,0x100..0x700), cores 0-3 the Kryo-385 "silver" (A55) cluster, 4-7 the "gold" (A75). PSCI
+	 * via SMC (not HVC), no PL011. io_base must be non-zero or XNU skips SoC clock setup.
+	 */
+	.name = "fajita", .io_base = 0x00400000, .io_size = 0x3FC00000,
+	.gic_dist = 0x17A00000, .gic_redist = 0x17A60000, .uart = 0, .log_other_cpu = 1,
+	.cores = 8, .core_shift = 8,
+	.small_cores = 0x0f,
+};
+
 /* ------------------------------------------------------------------------ */
 
 static void
@@ -3932,6 +3946,15 @@ efi_main(efi_handle image, efi_system_table *st)
 		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
 		if (SCREEN.base == 0xE1000000ULL) {
 			PLAT = &platform_redwood;
+		} else if (SCREEN.base >= 0x9D400000ULL && SCREEN.base < 0x9F800000ULL) {
+			/*
+			 * OnePlus 6T (fajita): the UEFI hands us a working GOP framebuffer in the SDM845
+			 * cont-splash "Display Reserved" region (0x9D400000 + 0x02400000). Unlike QEMU a phone
+			 * needs no ramfb programming -- the GOP mode read just above IS the framebuffer. Calling
+			 * ramfb_phone_screen() here would store to QEMU's fw_cfg MMIO at 0x09020000, which is
+			 * unmapped on real hardware and faults: the first-boot "Synchronous Exception".
+			 */
+			PLAT = &platform_fajita;
 		} else {
 			ramfb_phone_screen();
 		}
