@@ -23,9 +23,9 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
                              plus tard : TTY nu (bureau tué) + make kernel JOBS=1, ou linker lld.
 [x] 4a. make-fajita-pkg + add-xnuloader ... OK (fajitaPkg généré, couche XnuLoader appliquée)
 [x] 4b. mono-devel installé ... OK (l'erreur Mono a disparu)
-🚩 4c. build_uefi.py ......... mu_nasm pas téléchargé (le 1er run avant Mono a créé Build/, du coup
-                             build_uefi saute l'update). Force-le : DeviceBuild --setup/--update,
-                             PUIS build_uefi (voir le bloc 🩹 de l'étape 4). Pas de `-u`.
+🚩 4c. build_uefi.py ......... NuGet n'arrive pas à installer mu_nasm (Mono OK mais TLS/réseau KO,
+                             cert-sync absent). CONTOURNEMENT retenu : neutraliser le ext_dep NuGet
+                             et utiliser le nasm d'apt (set_path). Voir le bloc 🩹🩹 de l'étape 4.
 [-] 5. firmware ............. OPTIONNEL pour le 1er boot (a630/wifi/modem ne sont pas dans le chemin
                              critique avec touchscreen=2). Tél en Android, et depuis la RACINE.
 [ ] 6. boot       (make DEVICE=oneplus-6t phone ARGS="touchscreen=2"  <- RACINE ; kernel prebuilt)
@@ -166,6 +166,24 @@ cd ..                                          # <- RETOUR À LA RACINE avant le
 > python3 build_uefi.py -d fajita -r RELEASE                               # repart, dépendances OK
 > cd ..
 > ```
+
+> 🩹🩹 **Si NuGet refuse quand même de télécharger `mu_nasm`** (« [Nuget] We failed to install this
+> version » même avec Mono en place — TLS de Mono cassé, pas de `cert-sync`, réseau...). Pas la peine
+> de s'acharner : **cette dépendance n'est que `nasm`**, que tu as déjà installé par apt, et le
+> descripteur a le flag **`set_path`** = edk2 veut juste `nasm` dans le `PATH`. On neutralise le
+> téléchargement NuGet et on pointe edk2 sur le `nasm` du système (méthode edk2 « hors-ligne ») :
+> ```sh
+> cd Mu-Silicium
+> mv Mu_Basecore/BaseTools/Bin/nasm_ext_dep.yaml Mu_Basecore/BaseTools/Bin/nasm_ext_dep.yaml.disabled
+> export NASM_PREFIX=/usr/bin/          # nasm d'apt est /usr/bin/nasm ; le prefix DOIT finir par /
+> which nasm && nasm -v                 # sanity : /usr/bin/nasm + version 2.x
+> source venv/bin/activate
+> python3 build_uefi.py -d fajita -r RELEASE
+> cd ..
+> ```
+> Rien d'autre à fetcher (le log ne liste qu'**une** dépendance en échec, `mu_nasm` ; les autres sont
+> OK). `build_uefi.py` ne touche pas à ce `.yaml`, donc la neutralisation tient — sauf si tu refais un
+> `git submodule update`, qui le restaurerait (re-fais le `mv` si ça arrive).
 
 > Si tu as déjà lancé `make-fajita-pkg.sh` **avant** de poser ton dtb, relance-le avec `--force` pour
 > réembarquer le bon. Tu n'as pas à retoucher `add-xnuloader.sh` (il est idempotent).
