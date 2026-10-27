@@ -54,6 +54,25 @@ Si `./xl state` dit `loader`, on peut enchaîner `./xl ramdisk userland/system.a
 `DEVICE=oneplus-6t` est OBLIGATOIRE sur mkpayload/mkxnuimg/make : sinon `mkxnuimg` prend l'UEFI POCO
 (il lit `devices/oneplus-6t/uefi/uefi.conf` pour l'UEFI fajita : FD 0x9FC00000 / 0x300000).
 
+> ⚠️⚠️ **NE JAMAIS faire `fastboot --set-active=a`.** LineageOS est sur le slot **b**. Passer sur `a`
+> (vide/périmé) met le tél en **bootloop sur le logo** (pas de brick, le RAM-boot ne touche rien, mais
+> flippant). Récup : force l'extinction (Power ~12 s) → Power+Volume Haut → fastboot → `fastboot
+> --set-active=b` → `fastboot reboot`. Toujours `--set-active=b`, jamais `a`.
+
+> 💡 **Canal de log SANS USB** : le loader écrit son log (loader + kernel du dernier run) dans la
+> partition GPT **"logdump"** (sur ce 6T : `/dev/block/sde71`, symlink dans `/dev/block/by-name/`).
+> Après un boot, reboot en Android et : `adb root` puis
+> `adb shell 'dd if=/dev/block/sde71 bs=4096 count=64 2>/dev/null' > ~/logdump.bin && strings ~/logdump.bin`.
+> C'est le plan B quand l'USB bulk déconne (voir ci-dessous).
+
+> 🔌 **USB bulk capricieux sur fajita.** L'énumération marche (`fastboot devices` → `xnuloader`), mais
+> les transferts bulk (getvar, oem, upload ramdisk) sont intermittents : `getvar product` revient
+> tantôt vide tantôt en hang. Depuis l'HÔTE (hors distrobox) l'énumération est fiable mais le bulk
+> reste capricieux. Suspect : négociation SuperSpeed (le loader annonce HS 512 + SS 1024 ; bulk max
+> packet SS = 1024). Piste si on y revient : forcer HighSpeed, ou fiabiliser usb_wait. En attendant,
+> pour obtenir un **log de boot kernel**, passer par le boot AUTONOME (payload sans `--usb`, le loader
+> lance run_kernel tout seul) + lecture logdump — pas besoin de l'USB bulk.
+
 ## Le vrai dtb 6T (sinon l'ABL refuse de sauter)
 
 L'ABL du 6T valide le **board-id** du dtb appendé et **ne saute pas** s'il ne matche pas (6T=18801,
