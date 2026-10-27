@@ -23,19 +23,24 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
                              plus tard : TTY nu (bureau tué) + make kernel JOBS=1, ou linker lld.
 [x] 4a. make-fajita-pkg + add-xnuloader ... OK (fajitaPkg généré, couche XnuLoader appliquée)
 [x] 4b. mono-devel installé ... OK (l'erreur Mono a disparu)
-[x] 4c. nasm : NuGet KO -> contournement nasm d'apt (bloc 🩹🩹). OK, build passe les dépendances.
-🚩 4d. build_uefi.py ......... dossiers `fajita` manquants dans les submodules (ACPI puis Binaries),
-                             car fajitaPkg généré par l'ancien script. 2 x cp (bloc 🩹🩹🩹), puis le
-                             build doit sortir SILICIUM_UEFI.fd.
-[-] 5. firmware ............. OPTIONNEL pour le 1er boot (a630/wifi/modem ne sont pas dans le chemin
-                             critique avec touchscreen=2). Tél en Android, et depuis la RACINE.
-[ ] 6. boot       (make DEVICE=oneplus-6t phone ARGS="touchscreen=2"  <- RACINE ; kernel prebuilt)
-[ ] 7. m'envoyer le log
+[x] 4c. nasm : NuGet KO -> contournement nasm d'apt (bloc 🩹🩹). OK.
+[x] 4d. dossiers `fajita` manquants dans submodules (ACPI + Binaries) -> 2 x cp (bloc 🩹🩹🩹). OK.
+[x] 4e. build_uefi.py ......... OK -> SILICIUM_UEFI.fd (3 Mo) buildé. 🎉
+[-] 5. firmware ............. OPTIONNEL pour le 1er boot (a630/wifi/modem pas dans le chemin critique
+                             avec touchscreen=2). Tél en Android, depuis la RACINE.
+[x] 6a. dtb 6T réel ......... OBLIGATOIRE. Sans lui l'ABL refuse de sauter (fastboot boot = OKAY mais
+                             tél figé). Tiré via `adb root` + cat /sys/firmware/fdt (~500 Ko). OK.
+[x] 6b. fastboot boot ....... OK ! l'ABL saute enfin dans l'UEFI.
+🚩 6c. UEFI s'exécute ....... mais plante : « Synchronous Exception at 0x... » (crash EDK2/ArmPkg ->
+                             le cœur UEFI tourne). EN COURS : lire le dump (PC/module/ESR/FAR) pour
+                             savoir quel driver faute. Blobs Qualcomm empruntés à l'OnePlus 6 =
+                             suspect n°1 (un DXE device-specific qui tape un registre différent).
+[ ] 7. loader + kernel + log (une fois l'UEFI passé)
 ```
 
-**Ta prochaine commande :** forcer le téléchargement des dépendances UEFI puis builder (étape 4, bloc
-🩹). Et **avant tout `git pull`** pour avoir le fix mkxnuimg — sinon `make phone` boote l'UEFI de la
-POCO sur ta 6T (c'est ce qui vient de t'arriver : « loader did not come up »).
+**Ta prochaine étape :** lire le dump de l'exception UEFI à l'écran (photo) — PC, nom de module, ESR,
+FAR. C'est ce qui dit quel composant faute. On exécute enfin du code sur le tél ; reste à passer
+l'UEFI, puis on atteint le loader HakiOS et XNU.
 
 > ⚠️ **Deux pièges qui t'ont déjà mordu :**
 > 1. **`make ...` se lance depuis la RACINE du dépôt** (`~/hackios-xnu-kernel`), **jamais** depuis
@@ -136,12 +141,21 @@ sudo apt install mono-devel
 # si NuGet râle ensuite sur les certificats TLS :  sudo cert-sync /etc/ssl/certs/ca-certificates.crt
 ```
 
-**(Optionnel mais mieux) ton vrai dtb 6T.** Sans lui, `make-fajita-pkg.sh` embarque le dtb de
-l'OnePlus 6 (enchilada). Pose le tien avant de générer le paquet — ça le fait suivre dans l'UEFI
-**et** dans l'image de boot :
+**⚠️ TON VRAI DTB 6T — PAS OPTIONNEL.** Sans lui, l'image embarque le dtb de l'OnePlus 6
+(board-id 17819). L'ABL du 6T **valide le board-id du dtb appendé et refuse de sauter** s'il ne
+matche pas (18801) : `fastboot boot` répond `OKAY`/`Booting` mais le tél **reste figé sur l'écran
+fastboot** (vécu). Avec le bon dtb, l'ABL saute enfin dans l'UEFI. Tire-le du tél, en Android, via
+**`adb root`** (ton root c'est le daemon en root — la commande `su` n'existe pas ici) :
 ```sh
-adb shell su -c 'cat /sys/firmware/fdt' > devices/oneplus-6t/prebuilt/device-tree.dtb   # tél en Android
+adb wait-for-device && adb shell getprop sys.boot_completed   # attends "1"
+adb root                                                      # "restarting adbd as root" ; attends ~3 s
+adb shell id                                                  # doit montrer uid=0(root)
+adb shell 'cat /sys/firmware/fdt' > devices/oneplus-6t/prebuilt/device-tree.dtb   # doit faire ~500 Ko, pas 0
 ```
+> Le dtb vit au final dans `Mu-Silicium/Resources/DTBs/fajita.dtb` (ce que `mkxnuimg` appende). Soit
+> tu le poses dans `devices/oneplus-6t/prebuilt/device-tree.dtb` **avant** `make-fajita-pkg.sh` (il le
+> prend), soit tu l'écris direct dans `Mu-Silicium/Resources/DTBs/fajita.dtb` et tu reconstruis juste
+> l'image (`mkxnuimg`), sans rebuilder l'UEFI (le `.fd` n'embarque pas ce dtb).
 
 Puis le paquet et le build :
 ```sh
