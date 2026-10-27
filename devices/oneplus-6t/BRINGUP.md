@@ -22,13 +22,19 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
                              bureau ouvert ça passe pas (« ld64: Cannot fork »). Pour le builder
                              plus tard : TTY nu (bureau tué) + make kernel JOBS=1, ou linker lld.
 [x] 4a. make-fajita-pkg + add-xnuloader ... OK (fajitaPkg généré, couche XnuLoader appliquée)
-🚩 4b. build_uefi.py ......... BLOQUÉ sur Mono -> installe mono-devel (voir étape 4), puis relance.
-[ ] 5. firmware   (make DEVICE=oneplus-6t firmware   <- DEPUIS LA RACINE DU DÉPÔT, pas Mu-Silicium/)
-[ ] 6. boot       (make DEVICE=oneplus-6t phone ARGS="touchscreen=2"  <- idem, racine ; kernel prebuilt)
+[x] 4b. mono-devel installé ... OK (l'erreur Mono a disparu)
+🚩 4c. build_uefi.py ......... mu_nasm pas téléchargé (le 1er run avant Mono a créé Build/, du coup
+                             build_uefi saute l'update). Force-le : DeviceBuild --setup/--update,
+                             PUIS build_uefi (voir le bloc 🩹 de l'étape 4). Pas de `-u`.
+[-] 5. firmware ............. OPTIONNEL pour le 1er boot (a630/wifi/modem ne sont pas dans le chemin
+                             critique avec touchscreen=2). Tél en Android, et depuis la RACINE.
+[ ] 6. boot       (make DEVICE=oneplus-6t phone ARGS="touchscreen=2"  <- RACINE ; kernel prebuilt)
 [ ] 7. m'envoyer le log
 ```
 
-**Ta prochaine commande :** installer Mono, puis finir le build UEFI (étape 4). Pas besoin du kernel.
+**Ta prochaine commande :** forcer le téléchargement des dépendances UEFI puis builder (étape 4, bloc
+🩹). Et **avant tout `git pull`** pour avoir le fix mkxnuimg — sinon `make phone` boote l'UEFI de la
+POCO sur ta 6T (c'est ce qui vient de t'arriver : « loader did not come up »).
 
 > ⚠️ **Deux pièges qui t'ont déjà mordu :**
 > 1. **`make ...` se lance depuis la RACINE du dépôt** (`~/hackios-xnu-kernel`), **jamais** depuis
@@ -146,6 +152,21 @@ source venv/bin/activate
 python3 build_uefi.py -d fajita -r RELEASE     # -> Build/fajitaPkg/RELEASE_CLANGPDB/FV/SILICIUM_UEFI.fd
 cd ..                                          # <- RETOUR À LA RACINE avant les étapes 5 et 6 !
 ```
+
+> 🩹 **Si un premier `build_uefi.py` a déjà planté** (typiquement : il a tourné *avant* que Mono soit
+> installé et a échoué sur `mu_nasm`). Il a quand même créé le dossier `Build/fajitaPkg/…`, et
+> `build_uefi.py` **saute la phase de téléchargement des dépendances** quand ce dossier existe déjà et
+> que tu ne passes pas `-u` → tu te retrouves avec « Dependency 'mu_nasm' is not met! ... run
+> stuart_update ». Mono est prêt mais n'a jamais été appelé. Force le téléchargement **une fois**
+> (surtout **pas** `-u` : il ferait un `git pull` sur Mu-Silicium qui casserait ton arbre patché) :
+> ```sh
+> cd Mu-Silicium && source venv/bin/activate
+> python3 Platforms/OnePlus/fajitaPkg/DeviceBuild.py --setup  -t RELEASE
+> python3 Platforms/OnePlus/fajitaPkg/DeviceBuild.py --update -t RELEASE   # <- tire mu_nasm via NuGet/Mono
+> python3 build_uefi.py -d fajita -r RELEASE                               # repart, dépendances OK
+> cd ..
+> ```
+
 > Si tu as déjà lancé `make-fajita-pkg.sh` **avant** de poser ton dtb, relance-le avec `--force` pour
 > réembarquer le bon. Tu n'as pas à retoucher `add-xnuloader.sh` (il est idempotent).
 >
@@ -156,7 +177,13 @@ cd ..                                          # <- RETOUR À LA RACINE avant le
 
 ---
 
-## 5. Les firmwares de la 6T (une seule fois, tél en Android/LineageOS)
+## 5. Les firmwares de la 6T (OPTIONNEL pour le 1er boot — tél en Android/LineageOS)
+
+> **Saute cette étape pour ta première tentative.** Les firmwares (GPU a630, Wi-Fi WCN3990, ADSP,
+> modem) ne servent qu'aux drivers GPU/wifi/modem, qui ne sont **pas** activés par `touchscreen=2` et
+> ne sont pas sur le chemin critique du premier boot (on vise le mur UFS). `make DEVICE=oneplus-6t
+> firmware` échoue d'ailleurs si le tél n'est pas en **Android** sur adb (« no devices/emulators
+> found » = tu étais en fastboot). À faire plus tard, tél en Android, **depuis la racine**.
 
 ```sh
 make DEVICE=oneplus-6t firmware    # tire a630, wlanmdsp, adsp, modem... dans fw-*/
