@@ -21,13 +21,21 @@ Tout se fait sur ton PC Linux, la 6T branchée en USB. Commandes à copier-colle
                              touch (= milestone 4). Linker XNU veut ~13 Go RAM -> sur 16 Go avec un
                              bureau ouvert ça passe pas (« ld64: Cannot fork »). Pour le builder
                              plus tard : TTY nu (bureau tué) + make kernel JOBS=1, ou linker lld.
-🚩 4. UEFI fajita ........... TA SUITE
-[ ] 5. firmware (make DEVICE=oneplus-6t firmware)
-[ ] 6. boot sur le tél  (make DEVICE=oneplus-6t phone ARGS="touchscreen=2" -- prend le kernel prebuilt)
+[x] 4a. make-fajita-pkg + add-xnuloader ... OK (fajitaPkg généré, couche XnuLoader appliquée)
+🚩 4b. build_uefi.py ......... BLOQUÉ sur Mono -> installe mono-devel (voir étape 4), puis relance.
+[ ] 5. firmware   (make DEVICE=oneplus-6t firmware   <- DEPUIS LA RACINE DU DÉPÔT, pas Mu-Silicium/)
+[ ] 6. boot       (make DEVICE=oneplus-6t phone ARGS="touchscreen=2"  <- idem, racine ; kernel prebuilt)
 [ ] 7. m'envoyer le log
 ```
 
-**Ta prochaine commande :** l'UEFI (étape 4) -- pas besoin du kernel, le prebuilt suffit pour booter.
+**Ta prochaine commande :** installer Mono, puis finir le build UEFI (étape 4). Pas besoin du kernel.
+
+> ⚠️ **Deux pièges qui t'ont déjà mordu :**
+> 1. **`make ...` se lance depuis la RACINE du dépôt** (`~/hackios-xnu-kernel`), **jamais** depuis
+>    `Mu-Silicium/`. Les cibles `firmware`/`phone` sont dans le Makefile du haut ; depuis `Mu-Silicium/`
+>    tu as « Aucune règle pour fabriquer la cible ». Entre les deux : `cd ~/hackios-xnu-kernel`.
+> 2. Le build UEFI (`build_uefi.py`) va chercher `nasm` via NuGet, qui tourne via **Mono**. Sans Mono :
+>    « Mono is required to run NuGet ... Failed to fetch NugetDependecy: mu_nasm ». Fix à l'étape 4.
 
 ---
 
@@ -113,6 +121,22 @@ Ton driver touch (`hakios.oneplus6t.c`) est compilé automatiquement dans le ker
 
 ## 4. Construire l'UEFI fajita
 
+**Avant tout, Mono** (le build EDK2 tire `nasm` via NuGet, qui tourne via Mono — c'est ce qui a
+planté chez toi avec « Failed to fetch NugetDependecy: mu_nasm »). C'est le paquet que le propre
+`setup_env.sh` de Mu-Silicium installe sur Debian :
+```sh
+sudo apt install mono-devel
+# si NuGet râle ensuite sur les certificats TLS :  sudo cert-sync /etc/ssl/certs/ca-certificates.crt
+```
+
+**(Optionnel mais mieux) ton vrai dtb 6T.** Sans lui, `make-fajita-pkg.sh` embarque le dtb de
+l'OnePlus 6 (enchilada). Pose le tien avant de générer le paquet — ça le fait suivre dans l'UEFI
+**et** dans l'image de boot :
+```sh
+adb shell su -c 'cat /sys/firmware/fdt' > devices/oneplus-6t/prebuilt/device-tree.dtb   # tél en Android
+```
+
+Puis le paquet et le build :
 ```sh
 devices/oneplus-6t/uefi/make-fajita-pkg.sh     # génère le fajitaPkg (ton écran, ton board-id, ton dtb)
 devices/oneplus-6t/uefi/add-xnuloader.sh       # ajoute la couche qui démarre XNU
@@ -120,8 +144,15 @@ cd Mu-Silicium
 python3 -m venv venv && venv/bin/pip install -r pip-requirements.txt
 source venv/bin/activate
 python3 build_uefi.py -d fajita -r RELEASE     # -> Build/fajitaPkg/RELEASE_CLANGPDB/FV/SILICIUM_UEFI.fd
-cd ..
+cd ..                                          # <- RETOUR À LA RACINE avant les étapes 5 et 6 !
 ```
+> Si tu as déjà lancé `make-fajita-pkg.sh` **avant** de poser ton dtb, relance-le avec `--force` pour
+> réembarquer le bon. Tu n'as pas à retoucher `add-xnuloader.sh` (il est idempotent).
+>
+> Le reste de la chaîne (empaqueter `SILICIUM_UEFI.fd` + le BootShim + ton dtb dans l'image
+> `fastboot boot`) connaît fajita tout seul dès que tu passes `DEVICE=oneplus-6t` à `make` : les
+> adresses FD de la 6T (`0x9FC00000` / taille `0x300000`, différentes de la POCO) viennent de
+> `devices/oneplus-6t/uefi/uefi.conf`. Rien à régler à la main.
 
 ---
 
@@ -135,8 +166,18 @@ make DEVICE=oneplus-6t firmware    # tire a630, wlanmdsp, adsp, modem... dans fw
 
 ## 6. Booter sur le tél
 
-Mets la 6T en **fastboot** (éteins, puis Volume Haut + Power), branchée en USB. La 6T refuse
-`fastboot boot` sur un slot « usé » — d'abord :
+Mets la 6T en **fastboot** (éteins, puis Volume Haut + Power), branchée en USB.
+
+> ⚠️ **Le BON fastboot.** `fastboot boot` (charger en RAM) n'existe QUE dans le fastboot du
+> **bootloader** (écran « FASTBOOT mode »). **fastbootd** (fastboot *userspace*, écran avec menu,
+> atteint depuis le recovery) ne connaît pas `boot` → `FAILED (remote: unknown command)`. Vérifie :
+> ```sh
+> fastboot getvar is-userspace    # "yes" = fastbootd (MAUVAIS)  |  "no" = bootloader (BON)
+> ```
+> Si tu es en fastbootd : `fastboot reboot bootloader`. (Et `xl`/`make phone` partent d'Android et
+> font `adb reboot bootloader` tout seuls, donc en les laissant conduire tu es toujours dans le bon.)
+
+La 6T refuse `fastboot boot` sur un slot « usé » — d'abord :
 
 ```sh
 fastboot --set-active=b

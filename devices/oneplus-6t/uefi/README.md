@@ -65,6 +65,17 @@ The script is idempotent and reverts with `--revert`. It reuses the POCO's files
 of this shared layer rather than duplicating the 600-line patch here. After it, build Step 2's command
 produces an XNU-booting UEFI.
 
+## Step 4 — the `fastboot boot` image (handled for you by `DEVICE=oneplus-6t`)
+
+The top-level `mkxnuimg.py` wraps `SILICIUM_UEFI.fd` + the BootShim + the dtb into the Android boot
+image that `xl`/`make phone` upload with `fastboot boot`. It is device-aware: with `DEVICE=oneplus-6t`
+it reads `uefi.conf` here for the package stem (`fajita`) and the **FD base/size** the BootShim must
+copy the firmware volume to. Those are the 6T's, taken from Mu-Silicium's `fajita.toml` `[uefi_fd]`
+(`base = 0x9FC00000`, `size = 0x300000`) — and they differ from the POCO's (`0x9FD00000` / `0x200000`)
+on **both** base and size, so booting the 6T with the POCO's defaults would copy the FD to the wrong
+address at the wrong length and die. Nothing to run by hand; just keep `DEVICE=oneplus-6t` on the
+`make` line.
+
 ## ABL `fastboot boot` quirks (both the base and the HakiOS build)
 
 Per UniXNU-fajita, the 6T's stock ABL:
